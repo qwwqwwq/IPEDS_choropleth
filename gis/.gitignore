@@ -1,6 +1,9 @@
 *.tif
+*.xml
+*.cpg
 *.dbf
 *.prj
 *.shx
 *.shp
 *.csv
+*.zip

@@ -36,7 +36,7 @@ def instituion_points(filename):
     with open(filename) as f:
         reader = csv.DictReader(f)
         for row in reader:
-            yield ((float(row['LONG']), float(row['LAT'])), float(row['SIZECAT']))
+            yield ((float(row[2]), float(row[3])), float(row[4]))
 
 
 def get_distances(area_file, points_of_interest_file, output_file):

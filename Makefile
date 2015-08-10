@@ -3,16 +3,12 @@ all: gis/lower_48_contour.topojson
 gis/cb_2014_us_state_20m.zip:
 	wget -O gis/cb_2014_us_state_20m.zip "http://www2.census.gov/geo/tiger/GENZ2014/shp/cb_2014_us_state_20m.zip"
 
-gis/gebco_08_rev_elev_A1_grey_geo.tif:
-	wget -O gis/gebco_08_rev_elev_A1_grey_geo.tif "http://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73934/gebco_08_rev_elev_A1_grey_geo.tif"
-
-gis/gebco_08_rev_elev_B1_grey_geo.tif:
-	wget -O gis/gebco_08_rev_elev_B1_grey_geo.tif "http://eoimages.gsfc.nasa.gov/images/imagerecords/73000/73934/gebco_08_rev_elev_B1_grey_geo.tif"
-
 ipeds_data/hd2013.csv:
 	wget -O ipeds_data/HD2013.zip "http://nces.ed.gov/ipeds/datacenter/data/HD2013.zip"
-	cd ipeds_data && unzip HD2013.zip
+	wget -O ipeds_data/HD2013_Dict.zip "http://nces.ed.gov/ipeds/datacenter/data/HD2013_Dict.zip"
+	cd ipeds_data && unzip HD2013.zip && unzip HD2013_Dict.zip
 	touch ipeds_data/hd2013.csv
+	touch ipeds_data/hd2013.xlsx
 
 java/target/pairwise-1.0-SNAPSHOT.jar:
 	cd java && mvn clean package
@@ -31,33 +27,28 @@ gis/us_lower_48_states.shp: gis/us_lower_48_states_individual.shp
 	ogr2ogr gis/us_lower_48_states.shp gis/us_lower_48_states_individual.shp  -dialect sqlite -sql "SELECT ST_Union(geometry) FROM us_lower_48_states_individual"
 
 ipeds_data/institution_coordinates_data.csv: ipeds_data/hd2013.csv
-	PYTHONPATH=py python py/gen_map_dataset.py ipeds_data/institution_coordinates_data.csv
+	PYTHONPATH=py python py/generate_institution_coords_csv.py ipeds_data/institution_coordinates_data.csv
 
-gis/gebco_08_rev_elev_AB_grey_geo.tif: gis/gebco_08_rev_elev_B1_grey_geo.tif gis/gebco_08_rev_elev_A1_grey_geo.tif
-	gdalwarp gis/gebco_08_rev_elev_B1_grey_geo.tif gis/gebco_08_rev_elev_A1_grey_geo.tif gis/gebco_08_rev_elev_AB_grey_geo.tif
-
-gis/gebco_08_rev_elev_AB_grey_geo_resample.tif: gis/gebco_08_rev_elev_AB_grey_geo.tif
-	gdalwarp -tr 0.05 -0.05 -r average gis/gebco_08_rev_elev_AB_grey_geo.tif gis/gebco_08_rev_elev_AB_grey_geo_resample.tif
-
-gis/lower_48_dem.tif: gis/us_lower_48_states.shp gis/gebco_08_rev_elev_AB_grey_geo_resample.tif
-	gdalwarp -overwrite -of GTiff -cutline gis/us_lower_48_states.shp \
-		-crop_to_cutline gis/gebco_08_rev_elev_AB_grey_geo_resample.tif \
-		gis/lower_48_dem.tif
-
-gis/raster_coordinates_data.csv: gis/lower_48_dem.tif
-	python py/geotiff_to_csv.py gis/lower_48_dem.tif gis/raster_coordinates_data.csv
+gis/raster_coordinates_data.csv:
+	python py/generate_raster_csv.py 1156 498 -124.7258390 49.3843580 0.05 -0.05 gis/raster_coordinates_data.csv
 
 gis/raster_coordinates_reclassed.csv: gis/raster_coordinates_data.csv ipeds_data/institution_coordinates_data.csv java/target/pairwise-1.0-SNAPSHOT.jar
+ifndef $(s3_bucket)
+	spark-submit --master local[2] --class com.pairwise.PairwiseDistanceLocal java/target/pairwise-1.0-SNAPSHOT.jar ipeds_data/institution_coordinates_data.csv gis/raster_coordinates_data.csv tmp/ 2
+	cat tmp/* > gis/raster_coordinates_reclassed.csv
+	rm -rf tmp/
+else
 	PYTHONPATH=py python py/distributed_pairwise_distance.py \
 	    --raster_csv gis/raster_coordinates_data.csv \
 	    --institution_csv ipeds_data/institution_coordinates_data.csv \
 	    --jar java/target/pairwise-1.0-SNAPSHOT.jar \
-	    --output_s3_bucket jq-emr-bucket \
+	    --output_s3_bucket $(s3_bucket) \
 	    --output_s3_prefix ipeds_pairwise`date +"%m%d%Y-%H-%M-%S"` \
 	    --output_file gis/raster_coordinates_reclassed.csv
+endif
 
-gis/lower_48_dem_reclassed.tif: gis/raster_coordinates_reclassed.csv gis/lower_48_dem.tif
-	PYHTONPATH=py python py/reclass_raster.py gis/lower_48_dem.tif gis/raster_coordinates_reclassed.csv gis/lower_48_dem_reclassed_s.tif
+gis/lower_48_dem_reclassed.tif: gis/raster_coordinates_reclassed.csv
+	PYHTONPATH=py python py/reclass_raster.py 1156 498 -124.7258390 49.3843580 0.05 -0.05 gis/raster_coordinates_reclassed.csv gis/lower_48_dem_reclassed_s.tif
 	gdalwarp -t_srs EPSG:5070 -of GTiff -cutline gis/us_lower_48_states.shp \
 		-crop_to_cutline gis/lower_48_dem_reclassed_s.tif gis/lower_48_dem_reclassed.tif
 
