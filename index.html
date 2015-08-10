@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+body {
+  position: relative;
+}
+
+.key {
+  font: 10px sans-serif;
+  position: absolute;
+  top: 90px;
+  left: 0;
+}
+
+.caption {
+  font-weight: bold;
+}
+
+.key path {
+  display: none;
+}
+
+.key line {
+  stroke: #000;
+  shape-rendering: geometricPrecision;
+}
+
+@font-face {
+    font-family: usDeclaration;
+    src: url(static/vendor/us_declaration_font/USDeclaration.ttf);
+}
+
+h1 {
+    width: 900px;
+    text-align: center;
+    margin-bottom: -15px;
+    margin-top: -5px;
+    font-family: usDeclaration;
+}
+
+p {
+    width: 900px;
+    text-align: center;
+    margin-bottom: -15px;
+    font-family: 'EB Garamond', serif;
+}
+</style>
+<body>
+<h1>Land of Opportunity</h1>
+<p>Density of 4-year colleges in the continental United States</p>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.19/topojson.js"></script>
+<link href='http://fonts.googleapis.com/css?family=EB+Garamond' rel='stylesheet' type='text/css'>
+<script>
+
+var width = 960,
+    height = 600;
+
+var color = d3.scale.linear()
+        .domain([0, 7, 13, 50])
+	.range(["#d7191c","#fdae61","#a6d96a","#1a9641"].reverse());
+
+var x = d3.scale.linear()
+    .domain([0, 50])
+    .range([0, 250]);
+
+var xAxis = d3.svg.axis()
+    .scale(x)
+    .orient("bottom")
+    .tickSize(8)
+    .tickFormat(''); // No tick values
+
+var canvas = d3.select("body").append("canvas")
+    .attr("width", width)
+    .attr("height", height)
+        .attr("class", "chloropleth");
+
+var context = canvas.node().getContext("2d");
+
+var path = d3.geo.path()
+    .projection(null)
+    .context(context);
+
+var borderPath = d3.geo.path().projection(null)
+        .context(context);
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height)
+    .attr("class", "key")
+    .append("g")
+    .attr("transform", "translate(60," + (height - 70) + ")");
+
+svg.selectAll("rect")
+    .data(pair(x.ticks(12)))
+    .enter().append("rect")
+    .attr("height", 8)
+    .attr("x", function(d) { return x(d[0]); })
+    .attr("width", function(d) { return x(d[1]) - x(d[0]); })
+    .style("fill", function(d) { return color(d[0]); });
+
+svg.call(xAxis).append("text")
+    .attr("class", "caption")
+    .attr("y", -6)
+    .text("Fewer Colleges");
+
+svg.call(xAxis).append("text")
+    .attr("class", "caption")
+    .attr("y", -6)
+    .attr("x", 182)
+    .text("More Colleges");
+
+d3.json("gis/lower_48_contour.topojson", function(error, contour) {
+  if (error) throw error;
+
+  topojson.feature(contour, contour.objects.levels)
+      .features
+      .sort(function(a, b) { return a.elevation - b.elevation; })
+      .forEach(render);
+
+  topojson.feature(contour, contour.objects.us_lower_48_states_individual)
+      .features
+      .forEach(renderBorder);
+});
+
+
+function pair(array) {
+  return array.slice(1).map(function(b, i) {
+    return [array[i], b];
+  });
+}
+
+function render(d) {
+  var elev = d.properties.elevation;
+  context.fillStyle = color(elev);
+  context.beginPath();
+  path(d);
+  context.fill();
+}
+
+function renderBorder(d) {
+  context.strokeStyle = "rgba(255,255,255,0.8)";
+  context.lineWidth = 0.5;
+  context.beginPath();
+  borderPath(d);
+  context.stroke();
+}
+</script>
+
