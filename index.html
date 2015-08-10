@@ -47,10 +47,22 @@ p {
     margin-bottom: -15px;
     font-family: 'EB Garamond', serif;
 }
+img {
+    visibility: hidden;
+    position: absolute;
+}
+.source {
+    position: absolute;
+    margin-top: 600px;
+    text-align: right;
+    width: 770px;
+}
 </style>
 <body>
+<img src="static/preview.png">
 <h1>Land of Opportunity</h1>
 <p>Density of 4-year colleges in the continental United States</p>
+<p class="source"><a href="https://github.com/qwwqwwq/IPEDS_choropleth">source</a></p>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.19/topojson.js"></script>
 <link href='http://fonts.googleapis.com/css?family=EB+Garamond' rel='stylesheet' type='text/css'>
