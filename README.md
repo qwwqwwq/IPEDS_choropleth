@@ -10,8 +10,10 @@ Choropleth map of college density in the U.S.
 
 ## Dependencies
 
-- gdal
+- gdal (and python bindings)
 - maven
+- spark
+- numpy / pandas
 
 ## Build
 
